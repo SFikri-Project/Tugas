@@ -10,14 +10,6 @@ library(plotly)
 library(tidyr)
 library(readxl)
 library(sf)
-library(plotly)
-library(shinydashboardPlus)
-library(dashboardthemes)
-library(xgboost)
-library(caret)
-library(ggplot2)
-library(pROC)
-library(ggcorrplot)
 
 df <- read.csv("telecom_churn.csv", sep = ";")
 lang0 <- df[df$churn==0,"langganan_data"]
@@ -31,14 +23,11 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Beranda", tabName = "beranda", icon = icon("house")),
       menuItem("Dashboard", tabName = "dashboard", icon = icon("table-columns"),
-               menuSubItem("Visualisasi", tabName = "visualisasi"),
-               menuSubItem("Pemodelan", tabName = "pemodelan")),
       menuItem("Database", tabName = "database", icon = icon("database"))
     )
   ),
   dashboardBody(
     shinyDashboardThemes(
-      theme = "grey_light"
     ),
     tabItems(
       tabItem(tabName = "beranda",
@@ -60,11 +49,6 @@ ui <- dashboardPage(
                                        choices = c("All" = "all", "Churn" = 1, "No-Churn" = 0)),
                            width = 12
               )),
-              fluidRow(
-                infoBoxOutput(outputId = "Roam", width = 4),
-                infoBoxOutput(outputId = "DayMins", width = 4),
-                infoBoxOutput(outputId = "MonthlyCharge", width = 4)
-              ),
               fluidRow(
                 box(title = tags$b("Persentase Berlangganan Paket Data"), width = 6, status = "primary", solidHeader = TRUE,
                     plotOutput("BAR1DF", height = 300)),
@@ -108,78 +92,7 @@ ui <- dashboardPage(
                 tabPanel("Regresi",
                          box(width = 6,title = "Prediksi Biaya Langganan Seluler Per Bulan",
                              fluidRow(
-                               column(width = 6,
-                                      numericInput("num1",
-                                                   label = "Masukkan lama langganan:",
-                                                   value = NA),
-                                      numericInput("num2",
-                                                   label = "Masukkan penggunaan data:",
-                                                   value = NA),
-                                      numericInput("num3",
-                                                   label = "Masukkan durasi telpon:",
-                                                   value = NA)
-                               ),
-                               column(width = 6,
-                                      numericInput("num4",
-                                                   label = "Masukkan banyak telpon:",
-                                                   value = NA),
-                                      numericInput("num5",
-                                                   label = "Masukkan denda:",
-                                                   value = NA),
-                                      numericInput("num6",
-                                                   label = "Masukkan durasi minimum:",
-                                                   value = NA)
-                               )
-                             ),
-                             fluidRow(
-                               column(width = 12,
-                                      actionButton("predict_btn", "Prediksi", class = "btn-primary"),
-                                      br(), br()
-                               )
-                             ),
-                             fluidRow(
-                               uiOutput("prediksiBox")
-                             ),
-                             fluidRow(
-                               box(width = 12,title = "Analisis Residual",
-                                   plotOutput("res"))
-                             )),
-                         box(width = 6, height = 760, title="Data",
-                             DT::dataTableOutput("tbl")),
-                         fluidRow(
-                           box(width = 12,title = "Analisis Regresi",
-                               uiOutput("reglin"))),
-                         fluidRow(
-                           box(width = 12,
-                               verbatimTextOutput("summary"))
-                         )
-                ),
-                tabPanel("Klasifikasi",
-                         fluidRow(
-                           box(title = "Input Fitur", width = 6,
-                               numericInput("lama_langganan", "Lama Langganan:", value = NA, min = 0),
-                               numericInput("perbarui", "Perbarui:", value = NA, min = 0),
-                               numericInput("penggunaan_data", "Penggunaan Data:", value = NA, min = 0),
-                               numericInput("telpon_cs", "Telpon CS:", value = NA, min = 0),
-                               numericInput("durasi_telpon", "Durasi Telpon:", value = NA, min = 0),
-                               numericInput("banyak_telpon", "Banyak Telpon:", value = NA, min = 0),
-                               numericInput("biaya_bulanan", "Biaya Bulanan:", value = NA, min = 0),
-                               numericInput("denda", "Denda:", value = NA, min = 0),
-                               numericInput("durasi_min", "Durasi Min:", value = NA, min = 0),
-                               actionButton("predict_btn_klf", "Prediksi")
-                           ),
-                           box(title = "Hasil Prediksi", width = 6,
-                               plotOutput("probability_pie"),
-                               textOutput("interpretation")
-                           )
-                         ),
-                         fluidRow(
-                           box(title = "Ringkasan Model", width = 12,
-                               verbatimTextOutput("model_summary"),
-                               textOutput("accuracy_output"),
-                               plotOutput("confusion_matrix_plot")
-                           )
-                         ))
+                )
               )),
       tabItem(tabName = "database",
               tabBox(id = "t2", width = 12,
@@ -344,112 +257,7 @@ server <- function(input, output, session) {
       labs(x = "Churn Status", y = input$selvio, title = "Violin Plot by Churn Status") +
       theme_minimal()
   })
-  
-  ### PEMODELAN
-  
-  ## REGRESI
-  x1 <- df$lama_langganan
-  x2 <- df$langganan_data
-  x3 <- df$durasi_telpon
-  x4 <- df$banyak_telpon
-  x5 <- df$denda
-  x6 <- df$durasi_min
-  y <- df$biaya_bulanan
-  model <- lm(y ~ x1 + x2 + x3 + x4 + x5 + x6)
-  koefisien <- coef(model)
-  
-  observeEvent(input$predict_btn, {
-    output$prediksiBox <- renderUI({
-      num1 <- input$num1
-      num2 <- input$num2
-      num3 <- input$num3
-      num4 <- input$num4
-      num5 <- input$num5
-      num6 <- input$num6
-      prediksi <- koefisien[1] + koefisien[2] * num1 + koefisien[3] * num2 + koefisien[4] * num3 + koefisien[5] * num4 + koefisien[6] * num5 + koefisien[7] * num6
-      box(width = 12, title = "Hasil Prediksi Biaya Bulanan", status = "primary", solidHeader = TRUE,
-          paste("$", round(prediksi, 2)))
-      
-    })
-    
-    output$tbl <- DT::renderDataTable({
-      df
-    })
-    
-    output$res = renderPlot({
-      par(mfrow = c(2, 2))
-      plot(model, which = c(1:3, 5))
-    })
-    
-    output$reglin = renderUI({
-      
-      withMathJax(
-        paste0("\\(\\hat{\\beta} = (X^TX)^-1 X^TY \\)"),
-        br(),
-        paste0("\\(\\hat{\\beta}_0 = \\) ", round(model$coef[[1]], 3)),
-        br(),
-        paste0("\\(\\hat{\\beta}_1 = \\)", round(model$coef[[2]], 3)),
-        br(),
-        paste0("\\(\\hat{\\beta}_2 = \\) ", round(model$coef[[3]], 3)),
-        br(),
-        paste0("\\(\\hat{\\beta}_3 = \\) ", round(model$coef[[4]], 3)),
-        br(),
-        paste0("\\(\\hat{\\beta}_4 = \\)", round(model$coef[[5]], 3)),
-        br(),
-        paste0("\\(\\hat{\\beta}_5 = \\)", round(model$coef[[6]], 3)),
-        br(),
-        paste0("\\(\\hat{\\beta}_6 = \\)", round(model$coef[[7]], 3)),
-        br(),
-        paste0("\\( \\Rightarrow y = \\hat{\\beta}_0 + \\hat{\\beta}_1 x1 + \\hat{\\beta}_2 x2 + \\hat{\\beta}_3 x3 + \\hat{\\beta}_4 x4 =\\ + \\hat{\\beta}_5 x5 =\\ + \\hat{\\beta}_6 x6 =\\) ", 
-               round(model$coef[[1]], 3), " + ", 
-               round(model$coef[[2]], 3), "\\( x1 \\)", " + ", 
-               round(model$coef[[3]], 3), "\\( x2 \\)", " + ", 
-               round(model$coef[[4]], 3), "\\( x3 \\)", " + ", 
-               round(model$coef[[5]], 3), "\\( x4 \\)", " + ",
-               round(model$coef[[6]], 3), "\\( x5 \\)", " + ",
-               round(model$coef[[7]], 3), "\\( x6 \\)", " + ")
-      )
-    })
-    
-    output$summary = renderPrint({
-      summary(model)
-    })
-    
-  })
-  
-  output$structure = renderPrint(
-    str(df)
-  )
-  output$sumari = renderPrint(
-    summary(df)
-  )
-  output$dfb = renderDataTable(
-    df,extensions = 'Buttons',options=list(dom='Bfrtip',buttons=list('copy','pdf','excel','csv','print'))
-  )
-  
-  
-  ## KLASIFIKASI
-  
-  df$churn <- as.factor(df$churn)
-  set.seed(123)
-  trainIndex <- createDataPartition(df$churn, p = .8, list = FALSE, times = 1)
-  df=df[,-4]
-  dfTrain <- df[trainIndex,]
-  dfTest  <- df[-trainIndex,]
-  dtrain <- xgb.DMatrix(data = as.matrix(dfTrain[, -which(names(dfTrain) == "churn")]), label = as.numeric(dfTrain$churn) - 1)
-  
-  params <- list(
-    objective = "binary:logistic",
-    eval_metric = "error"
-  )
-  model_xgboost <- xgboost(data = dtrain, params = params, nrounds = 100, verbose = 0)
-  
-  pred_xgboost <- predict(model_xgboost, xgb.DMatrix(data = as.matrix(dfTest[, -which(names(dfTest) == "churn")])))
-  pred_xgboost_class <- ifelse(pred_xgboost > 0.5, "1", "0")
-  conf_matrix_xgboost <- confusionMatrix(as.factor(pred_xgboost_class), dfTest$churn)
-  accuracy_xgboost <- conf_matrix_xgboost$overall['Accuracy']
-  
-  
+
   observeEvent(input$predict_btn_klf, {
     
     new_data <- data.frame(
